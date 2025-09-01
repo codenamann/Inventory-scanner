@@ -1,0 +1,17 @@
+/* Custom styles for the inventory scanner app */
+
+/* Hide html5-qrcode default styles that don't match our design */
+#scanner-container {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+#scanner-container > div {
+  border: none !important;
+}
+
+/* Ensure camera feed is responsive */
+#scanner-container video {
+  max-width: 100% !important;
+  height: auto !important;
+}
