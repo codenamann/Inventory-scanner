@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
 import { useAppStore } from '../store/appStore';
 
 export default function Scanner() {
@@ -66,56 +66,49 @@ export default function Scanner() {
     try {
       console.log('Starting scanner initialization...');
       
-      // Check if camera is supported
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      stream.getTracks().forEach(track => track.stop()); // Stop the test stream
+      const scanner = new Html5Qrcode('scanner-container');
       
-      console.log('Camera permission granted, creating scanner...');
+      console.log('Getting camera devices...');
+      const cameras = await Html5Qrcode.getCameras();
       
-      const scanner = new Html5QrcodeScanner(
-        'scanner-container',
-        {
-          fps: 10,
-          qrbox: { width: 280, height: 280 },
-          aspectRatio: 1.0,
-          supportedScanTypes: [
-            Html5QrcodeScanner.SCAN_TYPE_CAMERA
-          ],
-          showTorchButtonIfSupported: true,
-          showZoomSliderIfSupported: true,
-          defaultZoomValueIfSupported: 2,
-          rememberLastUsedCamera: true,
-          showViewfinder: true
-        },
-        /* verbose= */ true
-      );
-
-      console.log('Rendering scanner...');
-      
-      scanner.render(
-        (decodedText, decodedResult) => {
-          console.log('Scan success:', decodedText);
-          handleScanSuccess(decodedText, decodedResult);
-        },
-        (error) => {
-          console.log('Scan error:', error);
-          // Only show persistent errors, not scanning errors
-          if (error.includes('Permission') || error.includes('NotAllowedError')) {
-            setError('Camera permission denied. Please allow camera access.');
+      if (cameras && cameras.length) {
+        const cameraId = cameras[0].id; // Use the first camera
+        console.log('Starting camera with ID:', cameraId);
+        
+        await scanner.start(
+          cameraId,
+          {
+            fps: 10,
+            qrbox: { width: 280, height: 280 },
+            aspectRatio: 1.0,
+            showTorchButtonIfSupported: true,
+            showZoomSliderIfSupported: true
+          },
+          (decodedText, decodedResult) => {
+            console.log('Scan success:', decodedText);
+            // Don't stop the scanner - just process the result
+            handleScanSuccess(decodedText, decodedResult);
+          },
+          (errorMessage) => {
+            // This will be called for every frame where no QR code is detected
+            // We don't want to log this as it's normal behavior
           }
-        }
-      );
-
-      scannerRef.current = scanner;
-      setIsInitialized(true);
-      setError('');
-      console.log('Scanner initialized successfully!');
+        );
+        
+        scannerRef.current = scanner;
+        setIsInitialized(true);
+        setError('');
+        console.log('Scanner started successfully and will keep running!');
+        
+      } else {
+        throw new Error('No cameras found');
+      }
       
     } catch (err) {
       console.error('Scanner initialization failed:', err);
       if (err.name === 'NotAllowedError') {
         setError('Camera permission denied. Please allow camera access and refresh the page.');
-      } else if (err.name === 'NotFoundError') {
+      } else if (err.name === 'NotFoundError' || err.message.includes('No cameras found')) {
         setError('No camera found. Please connect a camera and refresh the page.');
       } else {
         setError('Failed to initialize camera: ' + err.message);
@@ -154,10 +147,13 @@ export default function Scanner() {
         }
       }, 3000);
       
-      // Continue scanning after a brief pause
+      // Clear last scanned indicator after brief display
       setTimeout(() => {
         setLastScanned(null);
       }, 2000);
+      
+      // IMPORTANT: Do NOT stop scanning - let it continue for multiple scans
+      // The scanner should keep running until user manually stops it
       
     } catch (error) {
       console.error('Error processing scan:', error);
@@ -168,7 +164,9 @@ export default function Scanner() {
   const handleStopScanning = async () => {
     try {
       if (scannerRef.current) {
+        await scannerRef.current.stop();
         await scannerRef.current.clear();
+        scannerRef.current = null;
         setIsInitialized(false);
       }
     } catch (err) {
