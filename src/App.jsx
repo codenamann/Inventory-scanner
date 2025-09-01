@@ -93,7 +93,32 @@ function App() {
 
       {/* Main content area */}
       <main className="max-w-7xl mx-auto">
-        {activeTab === 'scan' && <Scanner />}
+        {activeTab === 'scan' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-4">
+            <div className="lg:col-span-2">
+              <Scanner />
+            </div>
+            {scannedItems.length > 0 && (
+              <div className="lg:col-span-1">
+                <div className="bg-white rounded-lg shadow-lg p-6 sticky top-20">
+                  <h4 className="text-lg font-semibold text-gray-900 mb-4">Quick View ({scannedItems.length})</h4>
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {scannedItems.slice(-10).reverse().map((item, index) => (
+                      <div key={item.id} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
+                        <span className="truncate">
+                          {typeof item.scannedData === 'string' ? item.scannedData : item.scannedData?.text || 'N/A'}
+                        </span>
+                        <span className="text-xs text-gray-500 ml-2">
+                          #{scannedItems.length - index}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         {activeTab === 'items' && <ItemsList />}
         {activeTab === 'export' && <ExportControls />}
       </main>
