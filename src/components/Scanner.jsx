@@ -72,18 +72,42 @@ export default function Scanner() {
       const cameras = await Html5Qrcode.getCameras();
       
       if (cameras && cameras.length) {
-        const cameraId = cameras[0].id; // Use the first camera
-        console.log('Starting camera with ID:', cameraId);
+        // Prioritize back-facing camera for barcode scanning
+        let selectedCamera = cameras[0]; // Default fallback
+        
+        // Look for back-facing camera (environment camera)
+        const backCamera = cameras.find(camera => 
+          camera.label && (
+            camera.label.toLowerCase().includes('back') ||
+            camera.label.toLowerCase().includes('rear') ||
+            camera.label.toLowerCase().includes('environment')
+          )
+        );
+        
+        if (backCamera) {
+          selectedCamera = backCamera;
+          console.log('Found back camera:', backCamera.label);
+        } else {
+          console.log('No back camera found, using:', selectedCamera.label || 'default camera');
+        }
+        
+        const cameraId = selectedCamera.id;
+        console.log('Starting camera with ID:', cameraId, 'Label:', selectedCamera.label);
+        
+        // Try to start with back camera constraints first
+        const startConfig = {
+          fps: 10,
+          qrbox: { width: 280, height: 280 },
+          aspectRatio: 1.0,
+          showTorchButtonIfSupported: true,
+          showZoomSliderIfSupported: true,
+          // Prefer back-facing camera
+          facingMode: { exact: "environment" }
+        };
         
         await scanner.start(
           cameraId,
-          {
-            fps: 10,
-            qrbox: { width: 280, height: 280 },
-            aspectRatio: 1.0,
-            showTorchButtonIfSupported: true,
-            showZoomSliderIfSupported: true
-          },
+          startConfig,
           (decodedText, decodedResult) => {
             console.log('Scan success:', decodedText);
             // Don't stop the scanner - just process the result
