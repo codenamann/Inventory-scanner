@@ -20,8 +20,11 @@ export default function Scanner() {
   } = useAppStore();
 
   useEffect(() => {
-    if (isScanning && !isInitialized && scannerRef.current) {
-      initializeScanner();
+    if (isScanning && !isInitialized) {
+      // Small delay to ensure DOM is ready
+      setTimeout(() => {
+        initializeScanner();
+      }, 100);
     }
 
     return () => {
@@ -59,8 +62,16 @@ export default function Scanner() {
     }
   };
 
-  const initializeScanner = () => {
+  const initializeScanner = async () => {
     try {
+      console.log('Starting scanner initialization...');
+      
+      // Check if camera is supported
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      stream.getTracks().forEach(track => track.stop()); // Stop the test stream
+      
+      console.log('Camera permission granted, creating scanner...');
+      
       const scanner = new Html5QrcodeScanner(
         'scanner-container',
         {
@@ -72,26 +83,43 @@ export default function Scanner() {
           ],
           showTorchButtonIfSupported: true,
           showZoomSliderIfSupported: true,
-          defaultZoomValueIfSupported: 2
+          defaultZoomValueIfSupported: 2,
+          rememberLastUsedCamera: true,
+          showViewfinder: true
         },
-        false
+        /* verbose= */ true
       );
 
+      console.log('Rendering scanner...');
+      
       scanner.render(
         (decodedText, decodedResult) => {
+          console.log('Scan success:', decodedText);
           handleScanSuccess(decodedText, decodedResult);
         },
         (error) => {
-          // Handle scan errors silently - they're frequent during scanning
           console.log('Scan error:', error);
+          // Only show persistent errors, not scanning errors
+          if (error.includes('Permission') || error.includes('NotAllowedError')) {
+            setError('Camera permission denied. Please allow camera access.');
+          }
         }
       );
 
       scannerRef.current = scanner;
       setIsInitialized(true);
       setError('');
+      console.log('Scanner initialized successfully!');
+      
     } catch (err) {
-      setError('Failed to initialize camera: ' + err.message);
+      console.error('Scanner initialization failed:', err);
+      if (err.name === 'NotAllowedError') {
+        setError('Camera permission denied. Please allow camera access and refresh the page.');
+      } else if (err.name === 'NotFoundError') {
+        setError('No camera found. Please connect a camera and refresh the page.');
+      } else {
+        setError('Failed to initialize camera: ' + err.message);
+      }
       setIsScanning(false);
     }
   };
@@ -282,9 +310,11 @@ export default function Scanner() {
         
         {/* Camera container with better styling */}
         <div className="relative">
-          <div id="scanner-container" className="w-full min-h-[400px] bg-gray-100 rounded-lg overflow-hidden"></div>
+          <div id="scanner-container" className="w-full min-h-[400px] bg-gray-100 rounded-lg overflow-hidden">
+            {/* This will be populated by Html5QrcodeScanner */}
+          </div>
           <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
-            Live Camera
+            📹 Live Camera
           </div>
         </div>
         
